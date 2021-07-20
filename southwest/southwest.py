@@ -3,6 +3,7 @@ import requests
 import json
 import sys
 import uuid
+import logging
 
 BASE_URL = 'https://mobile.southwest.com/api/'
 CHECKIN_INTERVAL_SECONDS = 0.25
@@ -24,7 +25,7 @@ class Reservation():
             modded = config_js.text[config_js.text.index("API_KEY"):]
             API_KEY = modded[modded.index(':') + 1:modded.index(',')].strip('"')
         else:
-            print("Couldn't get API_KEY")
+            logging.error("Couldn't get API_KEY")
             sys.exit(1)
 
         USER_EXPERIENCE_KEY = str(uuid.uuid1()).upper()
@@ -46,18 +47,17 @@ class Reservation():
                 data = r.json()
                 if 'httpStatusCode' in data and data['httpStatusCode'] in ['NOT_FOUND', 'BAD_REQUEST', 'FORBIDDEN']:
                     attempts += 1
-                    if not self.verbose:
-                        print(data['message'])
-                    else:
-                        print(r.headers)
-                        print(json.dumps(data, indent=2))
+                    logging.info(data['message'])
+                    logging.debug(r.headers)
+                    logging.debug(json.dumps(data, indent=2))
                     if attempts > MAX_ATTEMPTS:
-                        sys.exit("Unable to get data, killing self")
+                        logging.error("Unable to get data, killing self")
+                        sys.exit(1)
+                    logging.debug("Sleeping for {} seconds".format(CHECKIN_INTERVAL_SECONDS))
                     sleep(CHECKIN_INTERVAL_SECONDS)
                     continue
-                if self.verbose:
-                    print(r.headers)
-                    print(json.dumps(data, indent=2))
+                logging.debug(r.headers)
+                logging.debug(json.dumps(data, indent=2))
                 return data
         except ValueError:
             # Ignore responses with no json data in body
@@ -85,6 +85,6 @@ class Reservation():
         data = self.get_checkin_data()
         info_needed = data['_links']['checkIn']
         url = "{}mobile-air-operations{}".format(BASE_URL, info_needed['href'])
-        print("Attempting check-in...")
+        logging.info("Attempting check-in...")
         confirmation = self.load_json_page(url, info_needed['body'])
         return confirmation
